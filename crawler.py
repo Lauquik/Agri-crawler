@@ -21,7 +21,7 @@ class Crawler:
         for article in articles:
             try:
                 article_link = article.find('h3', class_='title').find('a')['href']
-                print(f"Crawling article no.{self.row_num}")
+                # print(f"Crawling article no.{self.row_num}")
                 self.Craw_Articles(article_link, sheet)
             except Exception:
                 print(f"failed to crawl {url}")
@@ -108,10 +108,8 @@ class Crawler:
         
 
 if __name__ == "__main__":
-    pages = 1
+    pages = 15
     url = "https://epubs.icar.org.in/index.php/IndFarm/issue/archive/"
-    crawl = Crawler([f"{url}{i}" for i in range(pages)])
+    crawl = Crawler([f"{url}{i}" for i in range(1, pages)])
     crawl.run(download_pdf=False)
     
-    
-
