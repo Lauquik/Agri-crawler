@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from openpyxl import Workbook
 import urllib3
 import os
+import re
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -70,7 +71,7 @@ class Crawler:
             if author_count > 3:
                 sheet.cell(row=1, column=col, value=f"{author_count}th Author")
                 sheet.cell(row=1, column=col + 1, value=f"{author_count}th Author Institute")
-            sheet.cell(row=self.row_num, column=col, value=author.find('span', class_='name').text.strip())
+            sheet.cell(row=self.row_num+1, column=col, value=author.find('span', class_='name').text.strip())
             
             institute = author.find('span', class_='affiliation')
             if institute:
@@ -86,7 +87,8 @@ class Crawler:
         html_content = self.fetch(pdf_url)
         pdf_Downlad_link = html_content.find('header').find('a', class_='download')['href']
         response = requests.get(pdf_Downlad_link, verify=False)
-        full_path = os.path.join('./pdfs', file_name+'.pdf')
+        sanitized_file_name = re.sub(r'[\\/?:*<>|]', '', file_name)
+        full_path = os.path.join('./pdfs', sanitized_file_name + ".pdf")
         if response.status_code == 200:
             with open(full_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=128):
