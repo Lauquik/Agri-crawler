@@ -11,9 +11,11 @@ class Crawler:
         self.urls_to_visit = urls
         self.row_num = 1
         self.download_pdf = True
+        self.session = requests.Session()
 
+        
     def fetch(self, url):
-        html = requests.get(url, verify=False)
+        html = self.session.get(url, verify=False)
         return BeautifulSoup(html.content, 'lxml')
 
     def write_articles(self, url, sheet):
@@ -24,7 +26,7 @@ class Crawler:
                 # print(f"Crawling article no.{self.row_num}")
                 self.Craw_Articles(article_link, sheet)
             except Exception:
-                print(f"failed to crawl {url}")
+                print(f"failed to crawl {article_link}")
 
     def crawlIssues(self, url):
         issue_links = []        
@@ -44,39 +46,41 @@ class Crawler:
 
     def Craw_Articles(self, article_url, sheet):
         html_content = self.fetch(article_url)
-        publish = html_content.find('div', class_='item published').find_all('div', class_='value')
+        publish = html_content.find('div', class_='item published')
+        if publish:
+            publish=publish.find_all('div', class_='value')
         title = html_content.find('h1', class_='page_title')
-        keywords = html_content.find('section', class_='item keywords').find('span', class_='value')
+        keywords = html_content.find('section', class_='item keywords')
+        if keywords:
+            keywords=keywords.find('span', class_='value')
         authors_details = html_content.find('ul', class_='authors').find_all('li')
         pdf_link = html_content.find('div', class_='item galleys').find('a', class_='obj_galley_link pdf')['href']
     
-        
-        headers = ['Serial No.', 'Article Link', 'Issue Publish Date', 'Article Title', 'Keywords',
-                'Author Count', '1st Author Name', '1st Author Institute', '2nd Author Name', '2nd Author Institute',
-                '3rd Author Name', '3rd Author Institute'
-                ]
-        for col, header in enumerate(headers, start=1):  # Start column indexing from 1 in openpyxl
-            sheet.cell(row=1, column=col, value=header)
-
-        sheet.cell(row=self.row_num + 1, column=1, value=self.row_num)
-        sheet.cell(row=self.row_num + 1, column=2, value=article_url)
-        sheet.cell(row=self.row_num + 1, column=3, value=publish[1].text.strip())
-        sheet.cell(row=self.row_num + 1, column=4, value=title.text.strip())
-        sheet.cell(row=self.row_num + 1, column=5, value=keywords.text.strip())
-        sheet.cell(row=self.row_num + 1, column=6, value=len(authors_details))
+        sheet.cell(row=self.row_num+1 , column=1, value=self.row_num)
+        sheet.cell(row=self.row_num+1, column=2, value=article_url)
+        if publish:
+            sheet.cell(row=self.row_num+1, column=3, value=publish[1].text.strip())
+        sheet.cell(row=self.row_num+1, column=4, value=title.text.strip())
+        if keywords:
+            sheet.cell(row=self.row_num+1, column=5, value=keywords.text.strip())
+        sheet.cell(row=self.row_num+1, column=6, value=len(authors_details))
 
         for author_count, author in enumerate(authors_details, start=1):
             col = 2 * author_count + 5
             if author_count > 3:
                 sheet.cell(row=1, column=col, value=f"{author_count}th Author")
                 sheet.cell(row=1, column=col + 1, value=f"{author_count}th Author Institute")
-            sheet.cell(row=self.row_num + 1, column=col, value=author.find('span', class_='name').text.strip())
-            sheet.cell(row=self.row_num + 1, column=col + 1, value=author.find('span', class_='affiliation').text.strip())
+            sheet.cell(row=self.row_num, column=col, value=author.find('span', class_='name').text.strip())
+            
+            institute = author.find('span', class_='affiliation')
+            if institute:
+                sheet.cell(row=self.row_num+1, column=col + 1, value=institute.text.strip())
 
         if self.download_pdf:
             self.download_pdf(pdf_link, title.text.strip())
             
         self.row_num+=1
+
 
     def download_pdf(self, pdf_url, file_name):
         html_content = self.fetch(pdf_url)
@@ -90,10 +94,19 @@ class Crawler:
         else:
             print(f"Failed to download the file. Status code: {response.status_code}")
 
+    def init_workbook(self, sheet):
+        headers = ['Serial No.', 'Article Link', 'Issue Publish Date', 'Article Title', 'Keywords',
+                'Author Count', '1st Author Name', '1st Author Institute', '2nd Author Name', '2nd Author Institute',
+                '3rd Author Name', '3rd Author Institute'
+                ]
+        for col, header in enumerate(headers, start=1):
+            sheet.cell(row=1, column=col, value=header)
+
     def run(self, download_pdf):
         workbook = Workbook()
         self.download_pdf=download_pdf
         sheet = workbook.active
+        self.init_workbook(sheet)
         while self.urls_to_visit:
             url = self.urls_to_visit.pop(0)
             print(f"crawling {url}")
@@ -102,7 +115,7 @@ class Crawler:
                 for issue in issues:
                     self.write_articles(issue, sheet)
             except Exception:
-                print(f"failed to crawl {url}")
+                print(f"failed to crawl issue{url}")
             
         workbook.save('article_details.xlsx')
         
